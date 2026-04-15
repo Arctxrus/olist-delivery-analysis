@@ -1,0 +1,20 @@
+# Database files
+*.sqlite
+*.db
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter notebook outputs
+# *.ipynb
