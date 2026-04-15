@@ -1,9 +1,27 @@
 -- ============================================================
 -- Sub-question 3: Is distance a confounder in the delay-vs-score
--- relationship?
+-- relationship? Are long-distance sellers being punished for
+-- geography rather than performance?
+--
+-- Approach:
+--   1. Get one representative lat/long per zip code prefix from
+--      the geolocation table (it has many duplicates per prefix).
+--   2. For each delivered order, look up seller and customer
+--      coordinates and compute great-circle distance using the
+--      Haversine formula.
+--   3. Bucket orders by distance and re-examine the delay-vs-score
+--      relationship within each distance band.
+--
+-- Hypothesis: Distance influences review scores primarily THROUGH
+-- delay (long distance -> more late deliveries -> worse reviews),
+-- not directly. If we control for delay state and the score still
+-- varies by distance, that means customers are punishing sellers
+-- for geography itself, which would be unfair.
 -- ============================================================
 
 WITH geo_dedup AS (
+    -- The geolocation table has many rows per zip prefix.
+    -- We average the coordinates to get one representative point.
     SELECT
         geolocation_zip_code_prefix AS zip_prefix,
         AVG(geolocation_lat) AS lat,
@@ -12,14 +30,16 @@ WITH geo_dedup AS (
     GROUP BY geolocation_zip_code_prefix
 ),
 
-order_zip_pairs AS (
-    -- Resolve each delivered order to a (seller_zip, customer_zip) pair
-    -- via a single straight-line join chain. No coordinates yet,
-    -- just zip prefixes — kept lightweight to avoid blow-up.
+order_geo AS (
+    -- Join orders to seller and customer coordinates.
+    -- Each order has one customer; for orders with multiple sellers
+    -- we take the first item's seller, same simplification as query 2.
     SELECT
         o.order_id,
-        s.seller_zip_code_prefix    AS seller_zip,
-        c.customer_zip_code_prefix  AS customer_zip,
+        s_geo.lat AS seller_lat,
+        s_geo.lng AS seller_lng,
+        c_geo.lat AS customer_lat,
+        c_geo.lng AS customer_lng,
         CASE
             WHEN CAST(julianday(o.order_delivered_customer_date)
                     - julianday(o.order_estimated_delivery_date) AS INTEGER) > 0
@@ -27,59 +47,39 @@ order_zip_pairs AS (
             ELSE 'On time or early'
         END AS delivery_state
     FROM orders o
-    JOIN customers c   ON o.customer_id = c.customer_id
+    JOIN customers c ON o.customer_id = c.customer_id
     JOIN order_items oi ON o.order_id = oi.order_id AND oi.order_item_id = 1
-    JOIN sellers s     ON oi.seller_id = s.seller_id
+    JOIN sellers s ON oi.seller_id = s.seller_id
+    JOIN geo_dedup s_geo ON s.seller_zip_code_prefix = s_geo.zip_prefix
+    JOIN geo_dedup c_geo ON c.customer_zip_code_prefix = c_geo.zip_prefix
     WHERE o.order_status = 'delivered'
       AND o.order_delivered_customer_date IS NOT NULL
 ),
 
-with_coords AS (
-    SELECT
-        p.order_id,
-        p.delivery_state,
-        sg.lat AS seller_lat,
-        sg.lng AS seller_lng,
-        cg.lat AS customer_lat,
-        cg.lng AS customer_lng
-    FROM order_zip_pairs p
-    JOIN geo_dedup sg ON p.seller_zip   = sg.zip_prefix
-    JOIN geo_dedup cg ON p.customer_zip = cg.zip_prefix
-),
-
 distances AS (
+    -- Haversine formula for great-circle distance in km.
+    -- 6371 = Earth's radius in km.
     SELECT
         order_id,
         delivery_state,
-        -- Haversine, with the inner sqrt argument clipped to [0,1]
-        -- defensively to avoid domain errors on near-identical points.
-        6371 * 2 * ASIN(
-            CASE
-                WHEN (
-                    POWER(SIN((customer_lat - seller_lat) * 3.14159265 / 180 / 2), 2)
-                    + COS(seller_lat   * 3.14159265 / 180)
-                    * COS(customer_lat * 3.14159265 / 180)
-                    * POWER(SIN((customer_lng - seller_lng) * 3.14159265 / 180 / 2), 2)
-                ) > 1 THEN 1
-                ELSE SQRT(
-                    POWER(SIN((customer_lat - seller_lat) * 3.14159265 / 180 / 2), 2)
-                    + COS(seller_lat   * 3.14159265 / 180)
-                    * COS(customer_lat * 3.14159265 / 180)
-                    * POWER(SIN((customer_lng - seller_lng) * 3.14159265 / 180 / 2), 2)
-                )
-            END
-        ) AS distance_km
-    FROM with_coords
+        6371 * 2 * ASIN(SQRT(
+            POWER(SIN((customer_lat - seller_lat) * 3.14159265 / 180 / 2), 2)
+            + COS(seller_lat * 3.14159265 / 180)
+            * COS(customer_lat * 3.14159265 / 180)
+            * POWER(SIN((customer_lng - seller_lng) * 3.14159265 / 180 / 2), 2)
+        )) AS distance_km
+    FROM order_geo
 ),
 
 bucketed AS (
     SELECT
         order_id,
         delivery_state,
+        distance_km,
         CASE
-            WHEN distance_km < 50   THEN '1. Local (<50 km)'
-            WHEN distance_km < 200  THEN '2. Regional (50-200 km)'
-            WHEN distance_km < 500  THEN '3. Inter-state (200-500 km)'
+            WHEN distance_km < 50 THEN '1. Local (<50 km)'
+            WHEN distance_km < 200 THEN '2. Regional (50-200 km)'
+            WHEN distance_km < 500 THEN '3. Inter-state (200-500 km)'
             WHEN distance_km < 1500 THEN '4. Long-haul (500-1500 km)'
             ELSE '5. Cross-country (1500+ km)'
         END AS distance_bucket
