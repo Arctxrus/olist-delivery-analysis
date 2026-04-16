@@ -13,7 +13,7 @@
 --      relationship within each distance band.
 --
 -- Hypothesis: Distance influences review scores primarily THROUGH
--- delay (long distance -> more late deliveries -> worse reviews),
+-- delay (long distance equals more late deliveries equals worse reviews),
 -- not directly. If we control for delay state and the score still
 -- varies by distance, that means customers are punishing sellers
 -- for geography itself, which would be unfair.
@@ -33,7 +33,6 @@ WITH geo_dedup AS (
 order_geo AS (
     -- Join orders to seller and customer coordinates.
     -- Each order has one customer; for orders with multiple sellers
-    -- we take the first item's seller, same simplification as query 2.
     SELECT
         o.order_id,
         s_geo.lat AS seller_lat,
