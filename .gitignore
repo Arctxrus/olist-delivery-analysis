@@ -1,6 +1,7 @@
 # Database files
 *.sqlite
 *.db
+*.session.sql
 
 # Python
 __pycache__/

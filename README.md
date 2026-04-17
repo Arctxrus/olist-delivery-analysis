@@ -14,6 +14,8 @@ This project started with one question and ended up answering five, each one pro
 
 Early and on-time deliveries cluster around 4.1 to 4.3 stars. The moment a delivery crosses its estimated date, the average drops to 2.7. Orders arriving 8-30 days late average 1.65. The relationship is not gradual; there is a hard cliff at day zero.
 
+One anomaly worth noting: orders arriving 30+ days late (n=331) actually score slightly higher than the 8-30 day late bucket. The most likely explanation is category mix in the tail; very long delays skew toward furniture and other forgiving categories where customers had lower urgency to begin with. The small sample size also limits confidence in this bucket.
+
 ![Delay vs review score](figures/01_delay_vs_score.png)
 
 ### 2. The penalty varies by category, by up to 28%
@@ -57,6 +59,12 @@ Three concrete moves, in priority order:
 **Set category-aware delivery estimates.** The modal delivery arrives about 13 days before the estimate, so Olist is already sandbagging conservatively. But the buffer should be even larger for emotional/gift categories (toys, watches, sports), where the penalty for slipping is steepest. A uniform buffer across all categories leaves predictable review damage on the table.
 
 **De-prioritise seller-trust badges as a defence against late-delivery damage.** The null result in section 4 is direct evidence that customer goodwill toward known sellers does not survive a bad delivery. Seller-tier signals may be worth building for other reasons (discoverability, conversion), but not as a shield against logistics failures.
+
+---
+
+### With more data, the next step is inferential
+
+This analysis is deliberately descriptive. The natural extension would be an ordinal logistic regression predicting review score from delay days (continuous), product category, shipping distance, and order value simultaneously. That model would quantify the marginal effect of each additional day of delay while controlling for the other variables, which is something the bucketed analysis above cannot do cleanly. It would also surface whether the category-sensitivity finding from section 2 survives as a genuine interaction term or is absorbed once you control for price and distance jointly. The Olist dataset has enough volume (96k delivered orders) to support this comfortably.
 
 ---
 
