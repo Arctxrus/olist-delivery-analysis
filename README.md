@@ -56,6 +56,38 @@ These are not interchangeable interventions. Rio needs a fix; São Paulo needs t
 
 ---
 
+## Interactive Power BI Dashboard
+
+The SQL analysis above answers the questions; the dashboard makes the answers explorable. Same data, same findings, presented as three pages with date filtering and cross-page interaction.
+
+### Pages
+
+**Executive Summary**
+
+Headline numbers and the day-zero cliff in one image. The combo chart shows the volume distribution of delivery outcomes alongside the average review score for each bucket, making the 5x overrepresentation of 1-star reviews among late orders visually immediate.
+
+![Executive Summary](dashboard/screenshots/01_executive_summary.png)
+
+**Delivery Deep Dive**
+
+Distribution of days late, a category-level scatter confirming the relationship holds broadly across product categories, and a state-level breakdown of late rates by customer location.
+
+![Delivery Deep Dive](dashboard/screenshots/02_delivery_deep_dive.png)
+
+**Seller View**
+
+The null result on seller size, demonstrated explicitly with a flat bar chart against the overall mean rather than buried in a noisy visual. Paired with an intervention priorities scatter that encodes order volume, revenue, and late rate to surface which sellers most need delivery support.
+
+![Seller View](dashboard/screenshots/03_seller_view.png)
+
+### How to view
+
+The `.pbix` file is at `dashboard/olist_dashboard.pbix`. Opening it requires Power BI Desktop (free, Windows only). Data preparation is handled by `dashboard/export_csvs.py`, which exports the relevant tables from the SQLite database to CSV for ingestion.
+
+The data model uses a star schema with single-direction relationships from dimensions to facts, bidirectional only on the order_items to orders link to support category-level slicing.
+
+---
+
 ## Recommendations
 
 Three concrete moves, in priority order:
@@ -98,6 +130,10 @@ olist-delivery-analysis/
 ├── notebooks/
 │   └── analysis.ipynb           # Full analysis with charts and narrative
 ├── figures/                     # Chart outputs from the notebook
+├── dashboard/
+│   ├── olist_dashboard.pbix
+│   ├── export_csvs.py
+│   └── screenshots/
 ├── data/
 │   └── README.md                # Download instructions for the dataset
 └── requirements.txt
@@ -120,7 +156,7 @@ The SQL queries in `queries/` are also independently runnable against the databa
 
 ## Tools
 
-Python (pandas, matplotlib), SQL (SQLite), Jupyter, VS Code with SQLTools.
+Python (pandas, matplotlib), SQL (SQLite), Jupyter, VS Code with SQLTools, Power BI Desktop (DAX).
 
 ## Data source
 
